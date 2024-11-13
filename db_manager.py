@@ -70,7 +70,6 @@ class DBManager:
         avg_salary = self.get_avg_salary()
         if avg_salary is None:
             return []
-
         query = """
             SELECT v.title, v.salary_min, v.salary_max, v.url, c.name
             FROM vacancies v

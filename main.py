@@ -47,7 +47,7 @@ while True:
         vacancies = db_manager.get_all_vacancies()
         for vacancy in vacancies:
             print(
-                f"Вакансия: {vacancy[0]}, От {vacancy[1]} до {vacancy[2]}, Ссылка: {vacancy[3]}, Компания: {vacancy[4]}")
+                f"Вакансия: {vacancy[0]}, От {vacancy[1]} до {vacancy[2]},Ссылка: {vacancy[3]}, Компания: {vacancy[4]}")
     elif choice == '2':
         companies = db_manager.get_companies_and_vacancies_count()
         for company in companies:
