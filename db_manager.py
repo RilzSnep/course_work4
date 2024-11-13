@@ -1,101 +1,97 @@
 import psycopg2
-from psycopg2 import sql
-import psycopg2.extras
+from typing import Optional, Any, List
+
 
 class DBManager:
-    def __init__(self, db_config):
-        self.conn = psycopg2.connect(**db_config)
-        self.cursor = self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    def __init__(self, db_params):
+        self.connection = psycopg2.connect(**db_params)
+        self.cursor = self.connection.cursor()
 
-    def create_tables(self):
-        """Создание таблиц для компаний и вакансий"""
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS companies (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                industry VARCHAR(255),
-                area VARCHAR(255)
-            );
-        """)
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS vacancies (
-                id SERIAL PRIMARY KEY,
-                title VARCHAR(255) NOT NULL,
-                salary_min INT,
-                salary_max INT,
-                employer_id INT,
-                url VARCHAR(255),
-                FOREIGN KEY (employer_id) REFERENCES companies(id)
-            );
-        """)
-        self.conn.commit()
+    def insert_company(self, company_name: str, industry: Optional[str] = None, area: Optional[str] = None) -> int:
+        query = "INSERT INTO companies (name, industry, area) VALUES (%s, %s, %s) ON CONFLICT (name) DO NOTHING RETURNING id"
+        self.cursor.execute(query, (company_name, industry, area))
+        self.connection.commit()
+        result = self.cursor.fetchone()
+        if result:
+            return result[0]
+        else:
+            query = "SELECT id FROM companies WHERE name = %s"
+            self.cursor.execute(query, (company_name,))
+            return self.cursor.fetchone()[0]
 
-    def insert_company(self, name, industry, area):
-        """Вставка новой компании в базу данных"""
-        self.cursor.execute("""
-            INSERT INTO companies (name, industry, area)
-            VALUES (%s, %s, %s) RETURNING id;
-        """, (name, industry, area))
-        company_id = self.cursor.fetchone()['id']
-        self.conn.commit()
-        return company_id
+    def insert_vacancy(self, company_id: int, vacancy_title: str, salary_min: Optional[int], salary_max: Optional[int],
+                       vacancy_url: str):
+        query = """
+            INSERT INTO vacancies (title, salary_min, salary_max, url, company_id)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (url) DO NOTHING
+        """
+        self.cursor.execute(query, (vacancy_title, salary_min, salary_max, vacancy_url, company_id))
+        self.connection.commit()
 
-    def insert_vacancy(self, title, salary_min, salary_max, employer_id, url):
-        """Вставка вакансии в базу данных"""
-        self.cursor.execute("""
-            INSERT INTO vacancies (title, salary_min, salary_max, employer_id, url)
-            VALUES (%s, %s, %s, %s, %s);
-        """, (title, salary_min, salary_max, employer_id, url))
-        self.conn.commit()
+    def insert_vacancies_bulk(self, vacancies: List[tuple]):
+        query = """
+            INSERT INTO vacancies (title, salary_min, salary_max, url, company_id)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (url) DO NOTHING
+        """
+        self.cursor.executemany(query, vacancies)
+        self.connection.commit()
 
-    def get_companies_and_vacancies_count(self):
-        """Получение списка компаний с количеством вакансий"""
-        self.cursor.execute("""
-            SELECT c.name, COUNT(v.id) AS vacancy_count
+    def get_companies_and_vacancies_count(self) -> List[tuple[Any, ...]]:
+        query = """
+            SELECT c.name, COUNT(v.id)
             FROM companies c
-            LEFT JOIN vacancies v ON c.id = v.employer_id
-            GROUP BY c.name;
-        """)
+            LEFT JOIN vacancies v ON c.id = v.company_id
+            GROUP BY c.id
+        """
+        self.cursor.execute(query)
         return self.cursor.fetchall()
 
-    def get_all_vacancies(self):
-        """Получение списка всех вакансий"""
-        self.cursor.execute("""
-            SELECT c.name, v.title, v.salary_min, v.salary_max, v.url
+    def get_all_vacancies(self) -> List[tuple[Any, ...]]:
+        query = """
+            SELECT v.title, v.salary_min, v.salary_max, v.url, c.name
             FROM vacancies v
-            JOIN companies c ON v.employer_id = c.id;
-        """)
+            JOIN companies c ON v.company_id = c.id
+        """
+        self.cursor.execute(query)
         return self.cursor.fetchall()
 
-    def get_avg_salary(self):
-        """Получение средней зарплаты по всем вакансиям"""
-        self.cursor.execute("""
-            SELECT AVG((salary_min + salary_max) / 2) AS avg_salary FROM vacancies;
-        """)
-        return self.cursor.fetchone()['avg_salary']
+    def get_avg_salary(self) -> Optional[float]:
+        query = """
+            SELECT AVG((COALESCE(v.salary_min, 0) + COALESCE(v.salary_max, 0)) / 2.0) AS avg_salary
+            FROM vacancies v
+            WHERE v.salary_min IS NOT NULL OR v.salary_max IS NOT NULL
+        """
+        self.cursor.execute(query)
+        return self.cursor.fetchone()[0]
 
-    def get_vacancies_with_higher_salary(self):
-        """Получение вакансий с зарплатой выше средней"""
+    def get_vacancies_with_higher_salary(self) -> List[tuple[Any, ...]]:
         avg_salary = self.get_avg_salary()
-        self.cursor.execute("""
-            SELECT c.name, v.title, v.salary_min, v.salary_max, v.url
+        if avg_salary is None:
+            return []
+
+        query = """
+            SELECT v.title, v.salary_min, v.salary_max, v.url, c.name
             FROM vacancies v
-            JOIN companies c ON v.employer_id = c.id
-            WHERE (v.salary_min + v.salary_max) / 2 > %s;
-        """, (avg_salary,))
+            JOIN companies c ON v.company_id = c.id
+            WHERE ((COALESCE(v.salary_min, 0) + COALESCE(v.salary_max, 0)) / 2.0) > %s
+        """
+        self.cursor.execute(query, (avg_salary,))
         return self.cursor.fetchall()
 
-    def get_vacancies_with_keyword(self, keyword):
-        """Получение вакансий по ключевому слову в названии"""
-        self.cursor.execute("""
-            SELECT c.name, v.title, v.salary_min, v.salary_max, v.url
+    def get_vacancies_with_keyword(self, keyword: str) -> List[tuple[Any, ...]]:
+        query = """
+            SELECT v.title, v.salary_min, v.salary_max, v.url, c.name
             FROM vacancies v
-            JOIN companies c ON v.employer_id = c.id
-            WHERE v.title LIKE %s;
-        """, ('%' + keyword + '%',))
+            JOIN companies c ON v.company_id = c.id
+            WHERE v.title ILIKE %s
+        """
+        self.cursor.execute(query, ('%' + keyword + '%',))
         return self.cursor.fetchall()
 
-    def close(self):
-        """Закрытие соединения с БД"""
-        self.cursor.close()
-        self.conn.close()
+    def close_connection(self):
+        if self.cursor:
+            self.cursor.close()
+        if self.connection:
+            self.connection.close()
