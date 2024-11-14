@@ -1,6 +1,6 @@
 from db_manager import DBManager
 from hh_api import get_vacancies_for_company
-
+"""information to connect to db"""
 db_params = {
     'dbname': 'postgres',
     'user': 'postgres',
@@ -31,7 +31,7 @@ for company_info in company_list:
         vacancy_records.append((vacancy_title, salary_min, salary_max, vacancy_url, db_company_id))
 
     db_manager.insert_vacancies_bulk(vacancy_records)
-
+"""inteface to database"""
 while True:
     print("\nВыберите действие:")
     print("1: Вывести все вакансии")

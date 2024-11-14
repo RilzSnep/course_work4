@@ -1,9 +1,10 @@
 import requests
-
+"""database connection url"""
 BASE_URL = "https://api.hh.ru/"
 
 
 def get_vacancies_for_company(employer_id=None, pages=1):
+    """function for getting information about vacancies from api"""
     all_vacancies = []
     params = {'employer_id': employer_id, 'per_page': 100} if employer_id else {'per_page': 100}
     url = f"{BASE_URL}vacancies"

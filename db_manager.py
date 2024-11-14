@@ -4,10 +4,12 @@ from typing import Optional, Any, List
 
 class DBManager:
     def __init__(self, db_params):
+        """Initialize DB connection"""
         self.connection = psycopg2.connect(**db_params)
         self.cursor = self.connection.cursor()
 
     def insert_company(self, company_name: str, industry: Optional[str] = None, area: Optional[str] = None) -> int:
+        """Insert company"""
         query = "INSERT INTO companies (name, industry, area) VALUES (%s, %s, %s) ON CONFLICT (name) DO NOTHING RETURNING id"
         self.cursor.execute(query, (company_name, industry, area))
         self.connection.commit()
@@ -21,6 +23,7 @@ class DBManager:
 
     def insert_vacancy(self, company_id: int, vacancy_title: str, salary_min: Optional[int], salary_max: Optional[int],
                        vacancy_url: str):
+        """Insert vacancies"""
         query = """
             INSERT INTO vacancies (title, salary_min, salary_max, url, company_id)
             VALUES (%s, %s, %s, %s, %s)
@@ -30,6 +33,7 @@ class DBManager:
         self.connection.commit()
 
     def insert_vacancies_bulk(self, vacancies: List[tuple]):
+        """Insert vacancies in bulk"""
         query = """
             INSERT INTO vacancies (title, salary_min, salary_max, url, company_id)
             VALUES (%s, %s, %s, %s, %s)
@@ -39,6 +43,7 @@ class DBManager:
         self.connection.commit()
 
     def get_companies_and_vacancies_count(self) -> List[tuple[Any, ...]]:
+        """Get companies and their vacancies count from db"""
         query = """
             SELECT c.name, COUNT(v.id)
             FROM companies c
@@ -49,6 +54,7 @@ class DBManager:
         return self.cursor.fetchall()
 
     def get_all_vacancies(self) -> List[tuple[Any, ...]]:
+        """Get all vacancies from db"""
         query = """
             SELECT v.title, v.salary_min, v.salary_max, v.url, c.name
             FROM vacancies v
@@ -58,6 +64,7 @@ class DBManager:
         return self.cursor.fetchall()
 
     def get_avg_salary(self) -> Optional[float]:
+        """Get average salary from db"""
         query = """
             SELECT AVG((COALESCE(v.salary_min, 0) + COALESCE(v.salary_max, 0)) / 2.0) AS avg_salary
             FROM vacancies v
@@ -67,6 +74,7 @@ class DBManager:
         return self.cursor.fetchone()[0]
 
     def get_vacancies_with_higher_salary(self) -> List[tuple[Any, ...]]:
+        """Get vacancies with average salary higher than average salary from db"""
         avg_salary = self.get_avg_salary()
         if avg_salary is None:
             return []
@@ -80,6 +88,7 @@ class DBManager:
         return self.cursor.fetchall()
 
     def get_vacancies_with_keyword(self, keyword: str) -> List[tuple[Any, ...]]:
+        """Get vacancies with keyword in title from db"""
         query = """
             SELECT v.title, v.salary_min, v.salary_max, v.url, c.name
             FROM vacancies v
@@ -90,6 +99,7 @@ class DBManager:
         return self.cursor.fetchall()
 
     def close_connection(self):
+        """Close DB connection"""
         if self.cursor:
             self.cursor.close()
         if self.connection:
