@@ -1,11 +1,16 @@
+import configparser
 from db_manager import DBManager
 from hh_api import get_vacancies_for_company
 
+# Чтение параметров из файла database.ini
+config = configparser.ConfigParser()
+config.read('database.ini')
+
 db_params = {
-    'dbname': 'postgres',
-    'user': 'postgres',
-    'password': '123456',
-    'host': 'localhost',
+    'dbname': config['database']['dbname'],
+    'user': config['database']['user'],
+    'password': config['database']['password'],
+    'host': config['database']['host']
 }
 
 db_manager = DBManager(db_params)
@@ -32,6 +37,7 @@ for company_info in company_list:
 
     db_manager.insert_vacancies_bulk(vacancy_records)
 
+# интерфейс взаимодействия с базой данных
 while True:
     print("\nВыберите действие:")
     print("1: Вывести все вакансии")
