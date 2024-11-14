@@ -1,11 +1,16 @@
+import configparser
 from db_manager import DBManager
 from hh_api import get_vacancies_for_company
-"""information to connect to db"""
+
+# Чтение параметров из файла database.ini
+config = configparser.ConfigParser()
+config.read('database.ini')
+
 db_params = {
-    'dbname': 'postgres',
-    'user': 'postgres',
-    'password': '123456',
-    'host': 'localhost',
+    'dbname': config['database']['dbname'],
+    'user': config['database']['user'],
+    'password': config['database']['password'],
+    'host': config['database']['host']
 }
 
 db_manager = DBManager(db_params)
@@ -31,7 +36,8 @@ for company_info in company_list:
         vacancy_records.append((vacancy_title, salary_min, salary_max, vacancy_url, db_company_id))
 
     db_manager.insert_vacancies_bulk(vacancy_records)
-"""inteface to database"""
+
+# интерфейс взаимодействия с базой данных
 while True:
     print("\nВыберите действие:")
     print("1: Вывести все вакансии")
@@ -47,7 +53,7 @@ while True:
         vacancies = db_manager.get_all_vacancies()
         for vacancy in vacancies:
             print(
-                f"Вакансия: {vacancy[0]}, От {vacancy[1]} до {vacancy[2]},Ссылка: {vacancy[3]}, Компания: {vacancy[4]}")
+                f"Вакансия: {vacancy[0]}, От {vacancy[1]} до {vacancy[2]}, Ссылка: {vacancy[3]}, Компания: {vacancy[4]}")
     elif choice == '2':
         companies = db_manager.get_companies_and_vacancies_count()
         for company in companies:
