@@ -2,10 +2,11 @@ import configparser
 from db_manager import DBManager
 from hh_api import get_vacancies_for_company
 
-# Чтение параметров из файла database.ini
+#  Import necessary modules and classes
 config = configparser.ConfigParser()
-config.read('database.ini')
+config.read('database.ini')  # Read database configuration from .ini file
 
+# Create a dictionary with database connection parameters
 db_params = {
     'dbname': config['database']['dbname'],
     'user': config['database']['user'],
@@ -13,31 +14,48 @@ db_params = {
     'host': config['database']['host']
 }
 
+
 db_manager = DBManager(db_params)
 
+#  Define a list of companies with ID and name
 company_list = [
     {'id': '1', 'name': 'Компания 1'},
     {'id': '2', 'name': 'Компания 2'}
 ]
 
+
 for company_info in company_list:
+    #  Extract employer ID and name from the company info
     employer_id = company_info['id']
     employer_name = company_info['name']
+
+    #  Get vacancies for current company HH API
     company_vacancies = get_vacancies_for_company(employer_id, pages=5)
+
+    #  Insert the company to database and get its database ID
     db_company_id = db_manager.insert_company(employer_name)
 
+    # Prepare a list of vacancy records to insert in bulk
     vacancy_records = []
     for company_vacancy in company_vacancies:
+        # Extract vacancy title or set default if missing
         vacancy_title = company_vacancy.get('name', 'Не указано')
+
+        #  Extract salary details or set none if missing
         salary_details = company_vacancy.get('salary')
         salary_min = salary_details.get('from') if salary_details else None
         salary_max = salary_details.get('to') if salary_details else None
+
+        # Extract vacancy URL or set default if missing
         vacancy_url = company_vacancy.get('alternate_url', 'Нет ссылки')
+
+        #  Add vacancy details to the list
         vacancy_records.append((vacancy_title, salary_min, salary_max, vacancy_url, db_company_id))
 
+    # Insert all vacancies to the database
     db_manager.insert_vacancies_bulk(vacancy_records)
 
-# интерфейс взаимодействия с базой данных
+# Provide a menu for user interaction with the database
 while True:
     print("\nВыберите действие:")
     print("1: Вывести все вакансии")
@@ -47,10 +65,14 @@ while True:
     print("5: Вывести вакансии с зарплатой выше средней")
     print("6: Выйти")
 
+    # Get user choice
     choice = input("Введите номер действия (1-6): ")
 
     if choice == '1':
+        #Fetch all vacancies from the database
         vacancies = db_manager.get_all_vacancies()
+
+        # Print each vacancy with details
         for vacancy in vacancies:
             print(
                 f"Вакансия: {vacancy[0]}, От {vacancy[1]} до {vacancy[2]}, Ссылка: {vacancy[3]}, Компания: {vacancy[4]}")
